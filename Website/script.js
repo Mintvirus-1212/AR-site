@@ -1,60 +1,78 @@
 console.log("✅ OpenCV & Three.js Script Loaded!");
 
-// Ensure OpenCV is fully loaded before running any OpenCV functions
-if (typeof cv === 'undefined') {
-    console.log("⏳ Waiting for OpenCV to load...");
-    document.addEventListener("opencv_ready", startApp);
-} else {
-    console.log("✅ OpenCV is already loaded!");
-    startApp();
+// **Function to Dynamically Load OpenCV.js**
+function loadOpenCV(callback) {
+    console.log("⏳ Loading OpenCV...");
+    let script = document.createElement("script");
+    script.src = "https://docs.opencv.org/4.5.5/opencv.js";
+    script.onload = () => {
+        console.log("✅ OpenCV Script Loaded!");
+        cv['onRuntimeInitialized'] = () => {
+            console.log("🚀 OpenCV is fully initialized!");
+            document.dispatchEvent(new Event('opencv_ready'));
+            callback();
+        };
+    };
+    document.head.appendChild(script);
 }
 
-function startApp() {
-    console.log("🚀 OpenCV is fully initialized!");
-    startScanning(document.getElementById("camera-feed"));
-}
+// **Event Listener for OpenCV Initialization**
+document.addEventListener("opencv_ready", startApp);
 
-// OpenCV Initialization (Wait for OpenCV to be ready)
-cv['onRuntimeInitialized'] = function () {
-    console.log("✅ OpenCV Ready!");
-    document.dispatchEvent(new Event("opencv_ready"));
-};
-
-// **Initialize Camera & Start Scanning**
-document.addEventListener("DOMContentLoaded", async function () {
-    console.log("📷 Initializing camera...");
-
-    const video = document.createElement("video");
-    video.setAttribute("id", "camera-feed");
-    video.setAttribute("autoplay", true);
-    video.setAttribute("playsinline", true);
-    video.style.position = "fixed";
-    video.style.top = "0";
-    video.style.left = "0";
-    video.style.width = "100vw";
-    video.style.height = "100vh";
-    video.style.objectFit = "cover";
-    video.style.zIndex = "999";
-    document.body.appendChild(video);
-
+// **Function to Request Camera Access**
+async function requestCameraAccess() {
     try {
+        console.log("📷 Requesting camera access...");
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+
+        let video = document.getElementById("camera-feed");
+        if (!video) {
+            video = document.createElement("video");
+            video.setAttribute("id", "camera-feed");
+            video.setAttribute("autoplay", true);
+            video.setAttribute("playsinline", true);
+            video.style.position = "fixed";
+            video.style.top = "0";
+            video.style.left = "0";
+            video.style.width = "100vw";
+            video.style.height = "100vh";
+            video.style.objectFit = "cover";
+            video.style.zIndex = "999";
+            document.body.appendChild(video);
+        }
         video.srcObject = stream;
-        video.addEventListener("loadeddata", () => startScanning(video));
+        console.log("✅ Camera access granted!");
+        return video;
     } catch (error) {
         console.error("❌ Camera access denied:", error);
         alert("Please enable camera access.");
+        return null;
     }
-});
+}
 
-// **Image Detection with OpenCV.js**
+// **Function to Start the Application**
+async function startApp() {
+    console.log("🚀 Starting Application...");
+
+    // Request Camera Access
+    let video = await requestCameraAccess();
+    if (!video) {
+        console.error("❌ Camera initialization failed. Exiting.");
+        return;
+    }
+
+    // Start Image Detection
+    startScanning(video);
+}
+
+// **Function for Image Recognition Using OpenCV.js**
 async function startScanning(video) {
-    console.log("🔍 OpenCV.js initialized!");
+    console.log("🔍 OpenCV.js initialized! Starting image detection...");
 
     try {
         let imgTarget = new Image();
-        imgTarget.crossOrigin = "anonymous"; 
-        imgTarget.src = "https://your-webflow-url.com/image.jpg"; // Replace with your actual image
+        imgTarget.crossOrigin = "anonymous";
+        imgTarget.src = "https://your-webflow-url.com/image.jpg"; // Replace with your actual image URL
 
         imgTarget.onload = function () {
             console.log("🎯 Reference image loaded!");
@@ -84,7 +102,7 @@ async function startScanning(video) {
                 let bf = new cv.BFMatcher(cv.NORM_HAMMING, true);
                 bf.match(descriptors1, descriptors2, matches);
 
-                if (matches.size() > 20) { 
+                if (matches.size() > 20) {
                     console.log("✅ High-confidence Target Detected!");
                     clearInterval(matchInterval);
                     startAROverlay();
@@ -101,3 +119,19 @@ async function startScanning(video) {
         console.error("❌ Error in startScanning():", error);
     }
 }
+
+// **Function to Capture a Frame from Camera for Processing**
+function captureFrame(video) {
+    console.log("📷 Capturing frame...");
+    let canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    let ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    let mat = cv.imread(canvas);
+    cv.cvtColor(mat, mat, cv.COLOR_RGBA2GRAY);
+    return mat;
+}
+
+// **Initialize OpenCV and Start the App**
+loadOpenCV(startApp);
