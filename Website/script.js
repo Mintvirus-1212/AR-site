@@ -1,23 +1,41 @@
-console.log("✅ OpenCV & Three.js Script Loaded!");
+console.log("✅ OpenCV & Three.js Script Loaded! V.1.0");
 
 // **Function to Dynamically Load OpenCV.js**
 function loadOpenCV(callback) {
     console.log("⏳ Loading OpenCV...");
+
     let script = document.createElement("script");
     script.src = "https://docs.opencv.org/4.5.5/opencv.js";
-    script.onload = () => {
-        console.log("✅ OpenCV Script Loaded!");
-        cv['onRuntimeInitialized'] = () => {
-            console.log("🚀 OpenCV is fully initialized!");
-            document.dispatchEvent(new Event('opencv_ready'));
-            callback();
-        };
+    script.onload = function () {
+        console.log("✅ OpenCV.js Loaded!");
+
+        let checkOpenCV = setInterval(() => {
+            if (typeof cv !== 'undefined' && cv.getBuildInformation) {
+                clearInterval(checkOpenCV);
+                console.log("🚀 OpenCV is fully initialized!");
+                document.dispatchEvent(new Event("opencv_ready"));
+                callback();
+            }
+        }, 100);
     };
     document.head.appendChild(script);
 }
 
 // **Event Listener for OpenCV Initialization**
 document.addEventListener("opencv_ready", startApp);
+
+// **Function to Start the Application**
+async function startApp() {
+    console.log("📷 Initializing camera...");
+    
+    let video = await requestCameraAccess();
+    if (!video) {
+        console.error("❌ Camera initialization failed. Exiting.");
+        return;
+    }
+
+    startScanning(video);
+}
 
 // **Function to Request Camera Access**
 async function requestCameraAccess() {
@@ -48,21 +66,6 @@ async function requestCameraAccess() {
         alert("Please enable camera access.");
         return null;
     }
-}
-
-// **Function to Start the Application**
-async function startApp() {
-    console.log("🚀 Starting Application...");
-
-    // Request Camera Access
-    let video = await requestCameraAccess();
-    if (!video) {
-        console.error("❌ Camera initialization failed. Exiting.");
-        return;
-    }
-
-    // Start Image Detection
-    startScanning(video);
 }
 
 // **Function for Image Recognition Using OpenCV.js**
